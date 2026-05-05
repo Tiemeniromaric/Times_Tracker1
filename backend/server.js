@@ -89,6 +89,15 @@ const authenticate = (req, res, next) => {
   }
 };
 
+// Admin middleware
+const requireAdmin = (req, res, next) => {
+  if (req.user && req.user.role === "admin") {
+    next();
+  } else {
+    return res.status(403).json({ error: "Access denied: Admins only" });
+  }
+};
+
 // Register
 app.post("/register", async (req, res) => {
   const { error } = registerSchema.validate(req.body);
@@ -134,17 +143,29 @@ app.post("/login", (req, res) => {
         return res.status(400).json({ error: "Invalid credentials" });
       }
 
-      const token = jwt.sign({ id: results[0].id }, process.env.JWT_SECRET, {
-        expiresIn: "1h",
-      });
+      // Token includes role
+      const token = jwt.sign(
+        { id: results[0].id, role: results[0].role },
+        process.env.JWT_SECRET,
+        { expiresIn: "1h" },
+      );
 
       console.log(`Login successful for ${email}`);
-      res.json({ token });
+      // Response includes role
+      res.json({ token, role: results[0].role });
     },
   );
 });
 
-// Projects
+// Admin-only route example
+app.get("/admin/users", authenticate, requireAdmin, (req, res) => {
+  db.query("SELECT id, email, role FROM users", (err, results) => {
+    if (err) return res.status(500).json({ error: "Database error" });
+    res.json(results);
+  });
+});
+
+// Projects routes (authenticate remains the same)
 app.post("/projects", authenticate, (req, res) => {
   const { error } = projectSchema.validate(req.body);
   if (error) return res.status(400).json({ error: error.details[0].message });
@@ -220,19 +241,15 @@ app.post("/time", authenticate, (req, res) => {
 
   const { project_id, start_time, end_time, duration, notes } = req.body;
 
-  // ADDED: Convert ISO timestamps from the browser into MySQL DATETIME format
-  // WHY: MySQL DATETIME expects 'YYYY-MM-DD HH:MM:SS', not 'YYYY-MM-DDTHH:mm:ss.sssZ'
   const formatForMySQL = (value) => {
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return null;
     return d.toISOString().slice(0, 19).replace("T", " ");
   };
 
-  // ADDED: Create DB-safe datetime strings before the insert
   const mysqlStart = formatForMySQL(start_time);
   const mysqlEnd = formatForMySQL(end_time);
 
-  // ADDED: Fail early if timestamp conversion failed
   if (!mysqlStart || !mysqlEnd) {
     return res.status(400).json({ error: "Invalid start or end time" });
   }
@@ -242,35 +259,16 @@ app.post("/time", authenticate, (req, res) => {
 VALUES (?, ?, ?, ?, ?, ?)`,
     [
       req.user.id,
-      Number(project_id), // CHANGED: force numeric id instead of string
-      mysqlStart, // CHANGED: use MySQL-formatted datetime
-      mysqlEnd, // CHANGED: use MySQL-formatted datetime
+      Number(project_id),
+      mysqlStart,
+      mysqlEnd,
       duration,
-      notes || null, // CHANGED: normalize empty string to NULL if your schema allows it
+      notes || null,
     ],
     (err, result) => {
       if (err) {
-        console.error("MySQL insert failed");
-        console.error("Full error object:", err);
-        console.error("err.code:", err.code);
-        console.error("err.errno:", err.errno);
-        console.error("err.sqlMessage:", err.sqlMessage);
-        console.error("err.sqlState:", err.sqlState);
-        console.error("Submitted values:", {
-          user_id: req.user.id,
-          project_id,
-          start_time,
-          end_time,
-          duration,
-          notes,
-        });
-
-        return res.status(500).json({
-          error: "Failed to log time",
-          debug: err.sqlMessage, // ADDED: helpful during development
-        });
+        return res.status(500).json({ error: "Failed to log time" });
       }
-
       res.json({ message: "Time logged" });
     },
   );
