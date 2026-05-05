@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 
 function Timer() {
   const [projects, setProjects] = useState([]);
@@ -23,7 +23,7 @@ function Timer() {
   useEffect(() => {
     const token = getAuthToken();
     if (!token) return;
-    axios.get('http://localhost:5000/projects', { headers: { Authorization: `Bearer ${token}` } })
+    api.get('/projects', { headers: { Authorization: `Bearer ${token}` } })
       .then(res => setProjects(res.data));
   }, []);
 
@@ -81,18 +81,20 @@ function Timer() {
     try {
       const token = getAuthToken();
       if (!token) return alert('Login required. Please refresh and login again.');
-      await axios.post('http://localhost:5000/time', {
+
+      await api.post('/time', {
         project_id: selectedProject,
         start_time: startTime.toISOString(),
         end_time: now.toISOString(),
         duration: elapsed,
         notes
       }, { headers: { Authorization: `Bearer ${token}` } });
+
       if (intervalId) {
         clearInterval(intervalId);
         setIntervalId(null);
       }
-      // Reset
+
       setStartTime(null);
       setEndTime(null);
       setElapsed(0);

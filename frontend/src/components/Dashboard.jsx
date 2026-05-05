@@ -2,9 +2,12 @@ import { Link, useNavigate } from 'react-router-dom';
 
 function Dashboard() {
   const navigate = useNavigate();
+  // Get the role stored during login
+  const userRole = localStorage.getItem('role');
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('role'); // Also clear the role on logout
     navigate('/');
   };
 
@@ -80,38 +83,18 @@ function Dashboard() {
           Dashboard
         </h1>
         <nav style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Link
-            to="/projects"
-            style={navItemStyle}
-            onMouseEnter={(e) => Object.assign(e.target.style, navItemHoverStyle)}
-            onMouseLeave={(e) => Object.assign(e.target.style, navItemStyle)}
-          >
-            Projects
-          </Link>
-          <Link
-            to="/timer"
-            style={navItemStyle}
-            onMouseEnter={(e) => Object.assign(e.target.style, navItemHoverStyle)}
-            onMouseLeave={(e) => Object.assign(e.target.style, navItemStyle)}
-          >
-            Timer
-          </Link>
-          <Link
-            to="/logs"
-            style={navItemStyle}
-            onMouseEnter={(e) => Object.assign(e.target.style, navItemHoverStyle)}
-            onMouseLeave={(e) => Object.assign(e.target.style, navItemStyle)}
-          >
-            Logs
-          </Link>
-          <button
-            onClick={logout}
-            style={logoutButtonStyle}
-            onMouseEnter={(e) => Object.assign(e.target.style, logoutButtonHoverStyle)}
-            onMouseLeave={(e) => Object.assign(e.target.style, logoutButtonStyle)}
-          >
-            Logout
-          </button>
+          <Link to="/projects" style={navItemStyle} onMouseEnter={(e) => Object.assign(e.target.style, navItemHoverStyle)} onMouseLeave={(e) => Object.assign(e.target.style, navItemStyle)}>Projects</Link>
+          <Link to="/timer" style={navItemStyle} onMouseEnter={(e) => Object.assign(e.target.style, navItemHoverStyle)} onMouseLeave={(e) => Object.assign(e.target.style, navItemStyle)}>Timer</Link>
+          <Link to="/logs" style={navItemStyle} onMouseEnter={(e) => Object.assign(e.target.style, navItemHoverStyle)} onMouseLeave={(e) => Object.assign(e.target.style, navItemStyle)}>Logs</Link>
+          
+          {/* Conditional Admin Button */}
+          {userRole === 'admin' && (
+            <Link to="/admin" style={{...navItemStyle, borderColor: '#ffc107'}}>
+              Admin Panel
+            </Link>
+          )}
+
+          <button onClick={logout} style={logoutButtonStyle} onMouseEnter={(e) => Object.assign(e.target.style, logoutButtonHoverStyle)} onMouseLeave={(e) => Object.assign(e.target.style, logoutButtonStyle)}>Logout</button>
         </nav>
       </div>
     </div>

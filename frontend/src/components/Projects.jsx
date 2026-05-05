@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 
 function Projects() {
   const [projects, setProjects] = useState([]);
@@ -24,7 +24,7 @@ function Projects() {
   const fetchProjects = () => {
     const token = getAuthToken();
     if (!token) return alert('Login required. Please refresh and login again.');
-    axios.get('http://localhost:5000/projects', { headers: { Authorization: `Bearer ${token}` } })
+    api.get('/projects', { headers: { Authorization: `Bearer ${token}` } })
       .then(res => setProjects(res.data))
       .catch(err => alert('Failed to fetch projects: ' + (err.response?.data?.error || err.message)));
   };
@@ -33,7 +33,7 @@ function Projects() {
     try {
       const token = getAuthToken();
       if (!token) return alert('Login required. Please refresh and login again.');
-      await axios.post('http://localhost:5000/projects', { name }, { headers: { Authorization: `Bearer ${token}` } });
+      await api.post('/projects', { name }, { headers: { Authorization: `Bearer ${token}` } });
       setName('');
       fetchProjects();
     } catch (err) {
@@ -50,7 +50,7 @@ function Projects() {
     try {
       const token = getAuthToken();
       if (!token) return alert('Login required. Please refresh and login again.');
-      await axios.put(`http://localhost:5000/projects/${id}`, { name: editName }, { headers: { Authorization: `Bearer ${token}` } });
+      await api.put(`/projects/${id}`, { name: editName }, { headers: { Authorization: `Bearer ${token}` } });
       setEditingId(null);
       setEditName('');
       fetchProjects();
@@ -64,7 +64,7 @@ function Projects() {
     try {
       const token = getAuthToken();
       if (!token) return alert('Login required. Please refresh and login again.');
-      await axios.delete(`http://localhost:5000/projects/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      await api.delete(`/projects/${id}`, { headers: { Authorization: `Bearer ${token}` } });
       fetchProjects();
     } catch (err) {
       alert('Failed to delete project: ' + (err.response?.data?.error || err.message));
@@ -162,7 +162,7 @@ function Projects() {
     if (!token) return alert('Login required. Please refresh and login again.');
     const now = new Date();
     try {
-      await axios.post('http://localhost:5000/time', {
+      await api.post('/time', {
         project_id: id,
         start_time: timer.startTime.toISOString(),
         end_time: now.toISOString(),

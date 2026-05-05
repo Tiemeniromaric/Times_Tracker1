@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 
 function Logs() {
   const [logs, setLogs] = useState([]);
@@ -22,7 +22,8 @@ function Logs() {
   const fetchLogs = () => {
     const token = getAuthToken();
     if (!token) return alert('Login required. Please refresh and login again.');
-    axios.get('http://localhost:5000/time', {
+
+    api.get('/time', {
       headers: { Authorization: `Bearer ${token}` },
       params: { project_id: projectFilter, date: dateFilter }
     }).then(res => setLogs(res.data));
@@ -32,8 +33,19 @@ function Logs() {
     <div style={{ maxWidth: '800px', margin: '20px auto', padding: '20px', border: '1px solid #ccc', borderRadius: '5px', backgroundColor: '#f9f9f9' }}>
       <h2>Time Logs</h2>
       <div style={{ marginBottom: '20px' }}>
-        <input type="text" placeholder="Filter by Project ID" value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} style={{ marginRight: '10px', padding: '8px', borderRadius: '3px', border: '1px solid #ccc' }} />
-        <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} style={{ padding: '8px', borderRadius: '3px', border: '1px solid #ccc' }} />
+        <input
+          type="text"
+          placeholder="Filter by Project ID"
+          value={projectFilter}
+          onChange={(e) => setProjectFilter(e.target.value)}
+          style={{ marginRight: '10px', padding: '8px', borderRadius: '3px', border: '1px solid #ccc' }}
+        />
+        <input
+          type="date"
+          value={dateFilter}
+          onChange={(e) => setDateFilter(e.target.value)}
+          style={{ padding: '8px', borderRadius: '3px', border: '1px solid #ccc' }}
+        />
       </div>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
