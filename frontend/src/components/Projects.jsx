@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../api';
 
 function Projects() {
@@ -6,7 +6,11 @@ function Projects() {
   const [name, setName] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
-  const [timers, setTimers] = useState({}); // { projectId: { startTime, endTime, elapsed, intervalId, notes, isRunning } }
+  const [timers, setTimers] = useState({});
+  const [selectedMedia, setSelectedMedia] = useState(null);
+  const [uploadError, setUploadError] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   const getAuthToken = () => {
     const token = localStorage.getItem('token');
@@ -183,13 +187,123 @@ function Projects() {
     setTimers(prev => ({ ...prev, [id]: { ...prev[id], notes } }));
   };
 
+  const handleMediaChange = (e) => {
+    const file = e.target.files[0];
+    setUploadError('');
+
+    if (!file) {
+      setSelectedMedia(null);
+      return;
+    }
+
+    const allowedTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'video/mp4',
+      'video/quicktime',
+    ];
+    const maxSize = 50 * 1024 * 1024;
+
+    if (!allowedTypes.includes(file.type)) {
+      setUploadError('Only JPG, PNG, GIF, MP4, and MOV files are allowed.');
+      e.target.value = '';
+      setSelectedMedia(null);
+      return;
+    }
+
+    if (file.size > maxSize) {
+      setUploadError('File is too large. Maximum size is 50MB.');
+      e.target.value = '';
+      setSelectedMedia(null);
+      return;
+    }
+
+    setSelectedMedia(file);
+  };
+
+  const uploadMedia = async () => {
+    if (!selectedMedia) {
+      setUploadError('Please choose a valid file first.');
+      return;
+    }
+
+    const token = getAuthToken();
+    if (!token) return alert('Login required. Please refresh and login again.');
+
+    const formData = new FormData();
+    formData.append('media', selectedMedia);
+
+    try {
+      setUploading(true);
+      setUploadError('');
+
+      await api.post('/upload', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      alert('File uploaded successfully');
+      setSelectedMedia(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (err) {
+      setUploadError(err.response?.data?.error || err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div style={{ maxWidth: '800px', margin: '20px auto', padding: '20px', border: '1px solid #ccc', borderRadius: '5px', backgroundColor: '#f9f9f9' }}>
       <h2>Projects</h2>
+
       <div style={{ marginBottom: '20px' }}>
-        <input type="text" placeholder="Project Name" value={name} onChange={(e) => setName(e.target.value)} style={{ marginRight: '10px', padding: '8px', borderRadius: '3px', border: '1px solid #ccc', width: '200px' }} />
-        <button onClick={addProject} style={{ padding: '8px 15px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Add Project</button>
+        <input
+          type="text"
+          placeholder="Project Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          style={{ marginRight: '10px', padding: '8px', borderRadius: '3px', border: '1px solid #ccc', width: '200px' }}
+        />
+        <button
+          onClick={addProject}
+          style={{ padding: '8px 15px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}
+        >
+          Add Project
+        </button>
       </div>
+
+      <div style={{ marginBottom: '25px', padding: '15px', border: '1px solid #ddd', borderRadius: '5px', backgroundColor: '#fff' }}>
+        <h3 style={{ marginTop: 0 }}>Upload Image or Video</h3>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/gif,video/mp4,video/quicktime"
+          onChange={handleMediaChange}
+          style={{ marginRight: '10px' }}
+        />
+        <button
+          onClick={uploadMedia}
+          disabled={uploading}
+          style={{
+            padding: '8px 15px',
+            backgroundColor: uploading ? '#6c757d' : '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '3px',
+            cursor: uploading ? 'not-allowed' : 'pointer'
+          }}
+        >
+          {uploading ? 'Uploading...' : 'Upload File'}
+        </button>
+
+        {uploadError && (
+          <p style={{ color: 'red', marginTop: '10px' }}>{uploadError}</p>
+        )}
+      </div>
+
       <ul style={{ listStyle: 'none', padding: 0 }}>
         {projects.map(p => {
           const timer = timers[p.id] || {};
@@ -207,7 +321,13 @@ function Projects() {
                   <button onClick={() => editProject(p.id, p.name)} style={{ padding: '5px 10px', backgroundColor: '#ffc107', color: 'black', border: 'none', borderRadius: '3px', cursor: 'pointer', marginRight: '5px' }}>Edit</button>
                   <button onClick={() => deleteProject(p.id)} style={{ padding: '5px 10px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer', marginRight: '10px' }}>Delete</button>
                   <br />
-                  <textarea placeholder="Notes" value={timer.notes || ''} onChange={(e) => updateNotes(p.id, e.target.value)} disabled={timer.isRunning} style={{ width: '100%', height: '60px', margin: '10px 0', padding: '5px', borderRadius: '3px', border: '1px solid #ccc' }} />
+                  <textarea
+                    placeholder="Notes"
+                    value={timer.notes || ''}
+                    onChange={(e) => updateNotes(p.id, e.target.value)}
+                    disabled={timer.isRunning}
+                    style={{ width: '100%', height: '60px', margin: '10px 0', padding: '5px', borderRadius: '3px', border: '1px solid #ccc' }}
+                  />
                   <div style={{ marginBottom: '10px' }}>
                     {!timer.startTime && <button onClick={() => startTimer(p.id)} style={{ padding: '8px 15px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer', marginRight: '5px' }}>Start Timer</button>}
                     {timer.isRunning && <button onClick={() => stopTimer(p.id)} style={{ padding: '8px 15px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer', marginRight: '5px' }}>Stop Timer</button>}
@@ -215,7 +335,9 @@ function Projects() {
                     {!timer.isRunning && timer.startTime && <button onClick={() => restartTimer(p.id)} style={{ padding: '8px 15px', backgroundColor: '#ffc107', color: 'black', border: 'none', borderRadius: '3px', cursor: 'pointer', marginRight: '5px' }}>Restart</button>}
                     {!timer.isRunning && timer.startTime && timer.elapsed > 0 && <button onClick={() => submitLog(p.id)} style={{ padding: '8px 15px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Submit Log</button>}
                   </div>
-                  <p style={{ marginTop: '10px', fontWeight: 'bold' }}>Elapsed: {Math.floor((timer.elapsed || 0) / 60)}:{((timer.elapsed || 0) % 60).toString().padStart(2, '0')}</p>
+                  <p style={{ marginTop: '10px', fontWeight: 'bold' }}>
+                    Elapsed: {Math.floor((timer.elapsed || 0) / 60)}:{((timer.elapsed || 0) % 60).toString().padStart(2, '0')}
+                  </p>
                 </div>
               )}
             </li>

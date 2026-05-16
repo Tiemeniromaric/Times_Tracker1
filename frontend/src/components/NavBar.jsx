@@ -3,16 +3,14 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 function NavBar() {
   const navigate = useNavigate();
   const location = useLocation();
-  // ADDED: get the role from localStorage
   const userRole = localStorage.getItem('role');
 
   const logout = () => {
     localStorage.removeItem('token');
-    localStorage.removeItem('role'); // ADDED: clear role on logout
+    localStorage.removeItem('role');
     navigate('/');
   };
 
-  // ... (all your styles remain the same)
   const navStyle = { backgroundColor: '#343a40', padding: '0', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', position: 'sticky', top: 0, zIndex: 1000 };
   const navContainerStyle = { maxWidth: '1200px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px' };
   const logoStyle = { color: '#fff', fontSize: '24px', fontWeight: 'bold', textDecoration: 'none', margin: 0 };
@@ -37,21 +35,25 @@ function NavBar() {
       <div style={navContainerStyle}>
         <Link to="/dashboard" style={logoStyle}>Timer App</Link>
         <ul style={navLinksStyle}>
-          {/* ... existing links ... */}
           <li style={navItemStyle}><Link to="/dashboard" style={getLinkStyle('/dashboard')}>Dashboard</Link></li>
           <li style={navItemStyle}><Link to="/projects" style={getLinkStyle('/projects')}>Projects</Link></li>
           <li style={navItemStyle}><Link to="/timer" style={getLinkStyle('/timer')}>Timer</Link></li>
           <li style={navItemStyle}><Link to="/logs" style={getLinkStyle('/logs')}>Logs</Link></li>
-          
-          {/* ADDED: Conditional Admin Link */}
+          <li style={navItemStyle}><Link to="/uploaded-images" style={getLinkStyle('/uploaded-images')}>Media</Link></li>
+
           {userRole === 'admin' && (
             <li style={navItemStyle}>
-              <Link to="/admin" style={{...getLinkStyle('/admin'), borderColor: '#ffc107'}}>Admin</Link>
+              <Link to="/admin" style={{ ...getLinkStyle('/admin'), borderColor: '#ffc107' }}>Admin</Link>
             </li>
           )}
 
           <li style={navItemStyle}>
-            <button onClick={logout} style={logoutButtonStyle} onMouseEnter={(e) => Object.assign(e.target.style, logoutButtonHoverStyle)} onMouseLeave={(e) => Object.assign(e.target.style, logoutButtonStyle)}>
+            <button
+              onClick={logout}
+              style={logoutButtonStyle}
+              onMouseEnter={(e) => Object.assign(e.target.style, logoutButtonHoverStyle)}
+              onMouseLeave={(e) => Object.assign(e.target.style, logoutButtonStyle)}
+            >
               Logout
             </button>
           </li>

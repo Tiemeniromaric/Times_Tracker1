@@ -6,9 +6,8 @@ import Timer from './components/Timer';
 import Logs from './components/Logs';
 import Projects from './components/Projects';
 import NavBar from './components/NavBar';
-// IMPORTING THE NEW COMPONENT
-import AdminPanel from './components/AdminPanel'; 
-
+import AdminPanel from './components/AdminPanel';
+import UploadedImages from './components/UploadedImages';
 
 const getAuthToken = () => {
   const token = localStorage.getItem('token');
@@ -19,17 +18,14 @@ const getAuthToken = () => {
   return token;
 };
 
-// Existing PrivateRoute for authenticated users
 function PrivateRoute({ children }) {
   const token = getAuthToken();
   return token ? children : <Navigate to="/" />;
 }
 
-// NEW: AdminRoute to protect admin-only pages
 function AdminRoute({ children }) {
   const token = getAuthToken();
   const role = localStorage.getItem('role');
-  // Redirect to dashboard if not an admin
   return (token && role === 'admin') ? children : <Navigate to="/dashboard" />;
 }
 
@@ -49,11 +45,11 @@ function AppContent() {
           <Route path="/timer" element={<PrivateRoute><Timer /></PrivateRoute>} />
           <Route path="/logs" element={<PrivateRoute><Logs /></PrivateRoute>} />
           <Route path="/projects" element={<PrivateRoute><Projects /></PrivateRoute>} />
-          
-          {/* NEW: Route for AdminPanel, protected by AdminRoute */}
           <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
+          <Route path="/uploaded-images" element={<PrivateRoute><UploadedImages /></PrivateRoute>} />
         </Routes>
       </div>
+
       <footer style={{
         textAlign: 'center',
         padding: '20px',

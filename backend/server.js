@@ -5,6 +5,9 @@ const bcrypt = require("bcryptjs");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
 require("dotenv").config();
 
 const {
@@ -15,9 +18,136 @@ const {
 } = require("./models");
 
 const app = express();
-app.use(helmet());
+
+app.use(
+  helmet({
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  }),
+);
 app.use(cors());
 app.use(express.json());
+
+// Ensure uploads folder exists
+const uploadDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+
+// Serve uploaded media statically
+app.use("/uploads", express.static(uploadDir));
+
+// Multer storage for media
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+    cb(null, uniqueName);
+  },
+});
+
+// Accept only image/video files
+const fileFilter = (req, file, cb) => {
+  const allowedMimeTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "video/mp4",
+    "video/quicktime",
+  ];
+
+  const okMime = allowedMimeTypes.includes(file.mimetype);
+  const okExt = /jpeg|jpg|png|gif|mp4|mov/i.test(
+    path.extname(file.originalname),
+  );
+
+  if (okMime && okExt) {
+    cb(null, true);
+  } else {
+    cb(
+      new Error(
+        "Only image files (jpg, png, gif) and video files (mp4, mov) are allowed",
+      ),
+    );
+  }
+};
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter,
+});
+
+// Public media upload endpoint
+app.post("/upload", (req, res) => {
+  upload.single("media")(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return res
+          .status(400)
+          .json({ error: "File too large. Max size is 50MB." });
+      }
+      return res.status(400).json({ error: err.message });
+    }
+
+    if (err) {
+      return res.status(400).json({ error: err.message });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded." });
+    }
+
+    return res.status(200).json({
+      message: "File uploaded successfully",
+      fileName: req.file.filename,
+      originalName: req.file.originalname,
+      mimeType: req.file.mimetype,
+      size: req.file.size,
+    });
+  });
+});
+
+// Media list route
+app.get("/uploads-list", (req, res) => {
+  fs.readdir(uploadDir, (err, files) => {
+    if (err) {
+      return res.status(500).json({ error: "Failed to read uploads folder" });
+    }
+
+    const media = files
+      .filter((file) => /\.(jpg|jpeg|png|gif|mp4|mov)$/i.test(file))
+      .map((file) => ({
+        name: file,
+        url: `/uploads/${file}`,
+        ext: path.extname(file).toLowerCase(),
+      }));
+
+    res.json(media);
+  });
+});
+
+// Delete uploaded media route
+app.delete("/uploads/:filename", (req, res) => {
+  const filePath = path.join(uploadDir, req.params.filename);
+
+  fs.access(filePath, fs.constants.F_OK, (err) => {
+    if (err) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    fs.unlink(filePath, (unlinkErr) => {
+      if (unlinkErr) {
+        return res.status(500).json({ error: "Failed to delete file" });
+      }
+
+      res.json({ message: "File deleted successfully" });
+    });
+  });
+});
 
 // Rate limiting
 const limiter = rateLimit({
@@ -37,7 +167,6 @@ app.use("/register", authLimiter);
 app.use("/login", authLimiter);
 
 let db;
-const fs = require("fs");
 
 const setupDb = mysql.createConnection({
   host: process.env.DB_HOST,
@@ -143,7 +272,6 @@ app.post("/login", (req, res) => {
         return res.status(400).json({ error: "Invalid credentials" });
       }
 
-      // Token includes role
       const token = jwt.sign(
         { id: results[0].id, role: results[0].role },
         process.env.JWT_SECRET,
@@ -151,7 +279,6 @@ app.post("/login", (req, res) => {
       );
 
       console.log(`Login successful for ${email}`);
-      // Response includes role
       res.json({ token, role: results[0].role });
     },
   );
@@ -165,7 +292,7 @@ app.get("/admin/users", authenticate, requireAdmin, (req, res) => {
   });
 });
 
-// Projects routes (authenticate remains the same)
+// Projects routes
 app.post("/projects", authenticate, (req, res) => {
   const { error } = projectSchema.validate(req.body);
   if (error) return res.status(400).json({ error: error.details[0].message });
