@@ -8,6 +8,7 @@ function NavBar() {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('role');
+    localStorage.removeItem('email');
     navigate('/');
   };
 
@@ -40,6 +41,7 @@ function NavBar() {
           <li style={navItemStyle}><Link to="/timer" style={getLinkStyle('/timer')}>Timer</Link></li>
           <li style={navItemStyle}><Link to="/logs" style={getLinkStyle('/logs')}>Logs</Link></li>
           <li style={navItemStyle}><Link to="/uploaded-images" style={getLinkStyle('/uploaded-images')}>Media</Link></li>
+          <li style={navItemStyle}><Link to="/chat" style={getLinkStyle('/chat')}>Chat</Link></li>
 
           {userRole === 'admin' && (
             <li style={navItemStyle}>

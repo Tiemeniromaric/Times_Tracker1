@@ -2,6 +2,8 @@ const express = require("express");
 const mysql = require("mysql2");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+const http = require("http");
+const { Server } = require("socket.io");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
@@ -18,6 +20,74 @@ const {
 } = require("./models");
 
 const app = express();
+const httpServer = http.createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+});
+
+// Track users currently online in memory
+const onlineUsers = new Map();
+
+io.on("connection", (socket) => {
+  console.log("Socket connected:", socket.id);
+
+  // When the client sends its logged-in user info, save it as online
+  socket.on("user:join", (user) => {
+    if (!user?.email) return;
+
+    onlineUsers.set(socket.id, {
+      email: user.email,
+      role: user.role || "user",
+    });
+
+    // Send a notification to everyone that this user joined
+    io.emit("notification:new", {
+      type: "info",
+      message: `${user.email} joined the app`,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Send the full online user list to every connected client
+    io.emit("presence:update", Array.from(onlineUsers.values()));
+  });
+
+  socket.on("chat_message", (message) => {
+    console.log("Chat message received:", message);
+
+    io.emit("chat_message", {
+      id: `${Date.now()}-${socket.id}`,
+      text: message.text,
+      user: message.user,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  // When a user leaves (disconnects), remove them from the online list
+  socket.on("user:leave", (user) => {
+    if (!user?.email) return;
+
+    for (const [socketId, onlineUser] of onlineUsers.entries()) {
+      if (onlineUser.email === user.email) {
+        onlineUsers.delete(socketId);
+      }
+    }
+
+    io.emit("presence:update", Array.from(onlineUsers.values()));
+  });
+
+  socket.on("disconnect", (reason) => {
+    console.log("Socket disconnected:", socket.id, reason);
+
+    // Remove the user from the online list when they disconnect
+    onlineUsers.delete(socket.id);
+
+    // Update everyone with the new online user list
+    io.emit("presence:update", Array.from(onlineUsers.values()));
+  });
+});
 
 app.use(
   helmet({
@@ -195,7 +265,7 @@ setupDb.query(schema, (err) => {
   db.connect((err) => {
     if (err) throw err;
     console.log("MySQL connected");
-    app.listen(5000, () => console.log("Server running on port 5000"));
+    httpServer.listen(5000, () => console.log("Server running on port 5000"));
   });
 });
 
@@ -261,6 +331,7 @@ app.post("/login", (req, res) => {
         console.error("Database error during login:", err);
         return res.status(500).json({ error: "Internal server error" });
       }
+
       if (results.length === 0) {
         console.log(`Login failed: email ${email} not found`);
         return res.status(400).json({ error: "Invalid credentials" });
@@ -278,8 +349,14 @@ app.post("/login", (req, res) => {
         { expiresIn: "1h" },
       );
 
+      const userEmail = results[0].email || email;
+
       console.log(`Login successful for ${email}`);
-      res.json({ token, role: results[0].role });
+      res.json({
+        token,
+        role: results[0].role,
+        email: userEmail,
+      });
     },
   );
 });
