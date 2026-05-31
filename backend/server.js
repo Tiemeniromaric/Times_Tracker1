@@ -1,3 +1,4 @@
+const { formatForMySQL } = require("./utils/time");
 const express = require("express");
 const mysql = require("mysql2");
 const jwt = require("jsonwebtoken");
@@ -247,27 +248,36 @@ const setupDb = mysql.createConnection({
 
 const schema = fs.readFileSync("../database/schema.sql", "utf8");
 
-setupDb.query(schema, (err) => {
-  if (err) {
-    console.error("Database setup error:", err);
-    process.exit(1);
-  }
-  console.log("Database setup complete");
-  setupDb.end();
+// Only run DB setup and start the HTTP server when NOT in test mode
+if (process.env.NODE_ENV !== "test") {
+  setupDb.query(schema, (err) => {
+    if (err) {
+      console.error("Database setup error:", err);
+      process.exit(1);
+    }
+    console.log("Database setup complete");
+    setupDb.end();
 
-  db = mysql.createConnection({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASS,
-    database: process.env.DB_NAME,
-  });
+    db = mysql.createConnection({
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASS,
+      database: process.env.DB_NAME,
+    });
 
-  db.connect((err) => {
-    if (err) throw err;
-    console.log("MySQL connected");
-    httpServer.listen(5000, () => console.log("Server running on port 5000"));
+    db.connect((err) => {
+      if (err) throw err;
+      console.log("MySQL connected");
+
+      // Only start listening when this file is run directly (not when imported by Jest)
+      if (require.main === module) {
+        httpServer.listen(5000, () =>
+          console.log("Server running on port 5000"),
+        );
+      }
+    });
   });
-});
+}
 
 // Auth middleware
 const authenticate = (req, res, next) => {
@@ -414,6 +424,11 @@ app.put("/projects/:id", authenticate, (req, res) => {
   );
 });
 
+// Health check route for tests and monitoring
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 app.delete("/projects/:id", authenticate, (req, res) => {
   db.query(
     "DELETE FROM time_entries WHERE project_id = ? AND user_id = ?",
@@ -499,3 +514,6 @@ app.get("/time", authenticate, (req, res) => {
     res.json(results);
   });
 });
+
+// Export the app for testing so Jest + Supertest can import it
+module.exports = app;
