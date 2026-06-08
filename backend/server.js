@@ -325,7 +325,7 @@ app.post("/register", async (req, res) => {
   );
 });
 
-// Login
+// Login (safe: parameterized, no SQL injection)
 app.post("/login", (req, res) => {
   const { error } = loginSchema.validate(req.body);
   if (error) return res.status(400).json({ error: error.details[0].message });
@@ -333,42 +333,42 @@ app.post("/login", (req, res) => {
   const { email, password } = req.body;
   console.log(`Login attempt for email: ${email}`);
 
-  db.query(
-    "SELECT * FROM users WHERE email = ?",
-    [email],
-    async (err, results) => {
-      if (err) {
-        console.error("Database error during login:", err);
-        return res.status(500).json({ error: "Internal server error" });
-      }
+  const sql = "SELECT * FROM users WHERE email = ?";
 
-      if (results.length === 0) {
-        console.log(`Login failed: email ${email} not found`);
-        return res.status(400).json({ error: "Invalid credentials" });
-      }
+  db.query(sql, [email], async (err, results) => {
+    if (err) {
+      console.error("Database error during login:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
 
-      const valid = await bcrypt.compare(password, results[0].password);
-      if (!valid) {
-        console.log(`Login failed: invalid password for ${email}`);
-        return res.status(400).json({ error: "Invalid credentials" });
-      }
+    if (results.length === 0) {
+      console.log(`Login failed: email ${email} not found`);
+      return res.status(400).json({ error: "Invalid credentials" });
+    }
 
-      const token = jwt.sign(
-        { id: results[0].id, role: results[0].role },
-        process.env.JWT_SECRET,
-        { expiresIn: "1h" },
-      );
+    const user = results[0];
 
-      const userEmail = results[0].email || email;
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) {
+      console.log(`Login failed: invalid password for ${email}`);
+      return res.status(400).json({ error: "Invalid credentials" });
+    }
 
-      console.log(`Login successful for ${email}`);
-      res.json({
-        token,
-        role: results[0].role,
-        email: userEmail,
-      });
-    },
-  );
+    const token = jwt.sign(
+      { id: user.id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" },
+    );
+
+    const userEmail = user.email || email;
+
+    console.log(`Login successful for ${userEmail} (safe path)`);
+    res.json({
+      token,
+      role: user.role,
+      email: userEmail,
+    });
+  });
 });
 
 // Admin-only route example
@@ -460,14 +460,14 @@ app.post("/time", authenticate, (req, res) => {
 
   const { project_id, start_time, end_time, duration, notes } = req.body;
 
-  const formatForMySQL = (value) => {
+  const formatForMySQLLocal = (value) => {
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return null;
     return d.toISOString().slice(0, 19).replace("T", " ");
   };
 
-  const mysqlStart = formatForMySQL(start_time);
-  const mysqlEnd = formatForMySQL(end_time);
+  const mysqlStart = formatForMySQLLocal(start_time);
+  const mysqlEnd = formatForMySQLLocal(end_time);
 
   if (!mysqlStart || !mysqlEnd) {
     return res.status(400).json({ error: "Invalid start or end time" });
