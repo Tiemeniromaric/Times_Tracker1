@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify';
 import { useEffect, useState } from 'react';
 import { socket } from '../socket';
 
@@ -41,6 +42,7 @@ function Chat() {
         {messages.map((msg) => (
           <div key={msg.id} style={{ marginBottom: '10px' }}>
             <strong>{msg.user}:</strong> {msg.text}
+            <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.text) }} />
             <div style={{ fontSize: '12px', color: '#777' }}>
               {new Date(msg.timestamp).toLocaleTimeString()}
             </div>
