@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - main
+
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
@@ -23,6 +24,10 @@ jobs:
       - name: Install backend dependencies
         working-directory: backend
         run: npm install
+
+      - name: List backend node_modules bin
+        working-directory: backend
+        run: ls -l node_modules/.bin
 
       - name: Install frontend dependencies
         working-directory: frontend
