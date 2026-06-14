@@ -20,7 +20,18 @@ const {
   timeEntrySchema,
 } = require("./models");
 
+// Simple in-memory items store for HTMX demo
+const demoItems = [
+  { id: 1, name: "First item" },
+  { id: 2, name: "Second item" },
+  { id: 3, name: "Third item" },
+];
+
 const app = express();
+
+// Serve static HTMX demo page
+app.use(express.static(path.join(__dirname, "public")));
+
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
   cors: {
@@ -98,6 +109,7 @@ app.use(
 );
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // parse HTMX form data
 
 // Ensure uploads folder exists
 const uploadDir = path.join(__dirname, "uploads");
@@ -422,6 +434,112 @@ app.put("/projects/:id", authenticate, (req, res) => {
       res.json({ message: "Project updated" });
     },
   );
+});
+
+// Simple items API for HTMX demo (no auth for now)
+app.get("/api/items", (req, res) => {
+  res.json(demoItems);
+});
+
+// Create a new item (for HTMX form) and return updated HTML list
+app.post("/api/items", (req, res) => {
+  console.log("Incoming POST /api/items body:", req.body);
+
+  const { name } = req.body;
+
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: "Name is required" });
+  }
+
+  const newItem = {
+    id: demoItems.length ? demoItems[demoItems.length - 1].id + 1 : 1,
+    name: name.trim(),
+  };
+
+  demoItems.push(newItem);
+
+  const html = `
+    <ul>
+      ${demoItems
+        .map(
+          (item) => `
+        <li>
+          ${item.name}
+          <button
+            hx-delete="/api/items/${item.id}"
+            hx-target="#items-container"
+            hx-swap="innerHTML"
+          >
+            Delete
+          </button>
+        </li>
+      `,
+        )
+        .join("")}
+    </ul>
+  `;
+
+  res.send(html);
+});
+
+// Delete an item and return updated HTML list
+app.delete("/api/items/:id", (req, res) => {
+  const id = Number(req.params.id);
+
+  const index = demoItems.findIndex((item) => item.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: "Item not found" });
+  }
+
+  demoItems.splice(index, 1);
+
+  const html = `
+    <ul>
+      ${demoItems
+        .map(
+          (item) => `
+        <li>
+          ${item.name}
+          <button
+            hx-delete="/api/items/${item.id}"
+            hx-target="#items-container"
+            hx-swap="innerHTML"
+          >
+            Delete
+          </button>
+        </li>
+      `,
+        )
+        .join("")}
+    </ul>
+  `;
+
+  res.send(html);
+});
+
+// HTMX endpoint: returns HTML built from items
+app.get("/items-partial", (req, res) => {
+  const html = `
+    <ul>
+      ${demoItems
+        .map(
+          (item) => `
+        <li>
+          ${item.name}
+          <button
+            hx-delete="/api/items/${item.id}"
+            hx-target="#items-container"
+            hx-swap="innerHTML"
+          >
+            Delete
+          </button>
+        </li>
+      `,
+        )
+        .join("")}
+    </ul>
+  `;
+  res.send(html);
 });
 
 // Health check route for tests and monitoring
