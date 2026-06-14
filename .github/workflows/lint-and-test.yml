@@ -23,7 +23,7 @@ jobs:
 
       - name: Install backend dependencies
         working-directory: backend
-        run: npm install
+        run: npm install --include=dev
 
       - name: List backend node_modules bin
         working-directory: backend
